@@ -6,26 +6,28 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore")  # ignore warnings in output
 
-# Step 1: Setup LLM(Mistral with HF)
+# get Hugging Face token from environment
 HF_TOKEN = os.environ.get("HF_TOKEN")
+# choose the LLM model to use
 huggingface_repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
-
+# load the LLM (text generator) from Hugging Face
 def load_llm(huggingface_repo_id):
     llm = HuggingFaceEndpoint(
-        repo_id = huggingface_repo_id,
+        repo_id=huggingface_repo_id,
         task="text-generation",
-        temperature = 0.5,
-        huggingfacehub_api_token=HF_TOKEN,
-        model_kwargs ={"max_length": 512}
+        temperature=0.5,
+        huggingfacehub_api_token=HF_TOKEN,  # pass token here
+        model_kwargs={"max_length": 512}  # limit response length
     )
     return llm
 
-
-# Step 2: Connet LLM with Faiss and Create a chain
+# path to the saved vector database
 DF_FAISS_PATH = "vectorstore/db_faiss"
+
+# prompt template for how the bot should talk
 custom_prompt_template = """
 You are a highly intelligent and helpful AI medical assistant. Your job is to answer user queries based strictly on the context provided below.
 
@@ -43,29 +45,32 @@ Question: {question}
 Answer:
 """
 
-
+# turn the above text into a usable prompt object
 def set_custom_prompt(custom_prompt_template):
-    prompt=PromptTemplate(template=custom_prompt_template, input_variables=["context", "question"])
+    prompt = PromptTemplate(template=custom_prompt_template, input_variables=["context", "question"])
     return prompt
 
-
+# load embedding model to convert text into vectors
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
+# load existing FAISS vector store (already built from documents)
 db = FAISS.load_local(DF_FAISS_PATH, embedding_model, allow_dangerous_deserialization=True)
 
-# Create a Question-Answer Chain
+# build the chatbot using the LLM + vector retriever + custom prompt
 qa_chain = RetrievalQA.from_chain_type(
-    llm= load_llm(huggingface_repo_id),
-    chain_type= "stuff",
-    retriever = db.as_retriever(search_kwargs={'k': 3}),
-    return_source_documents= True,
+    llm=load_llm(huggingface_repo_id),
+    chain_type="stuff",
+    retriever=db.as_retriever(search_kwargs={'k': 3}),  # get top 3 most similar chunks
+    return_source_documents=True,
     chain_type_kwargs={'prompt': set_custom_prompt(custom_prompt_template)}
 )
 
-
-# INvoke the chain with a single query
-user_query = input("Write Query here:")
+# take a question from the user
+user_query = input("Write Query here: ")
+# run the bot with the user question
 response = qa_chain.invoke({'query': user_query})
-print("Result:", response["result"])
-print("Source Documents", response["source_documents"])
 
+# show the answer
+print("Result:", response["result"])
+# show the documents it used to answer
+print("Source Documents:", response["source_documents"])

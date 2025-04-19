@@ -6,10 +6,13 @@ from langchain_core.prompts import PromptTemplate
 import os
 from langchain_huggingface import HuggingFaceEndpoint
 
+# path to saved vector DB
 DB_FAISS_PATH = 'vectorstore/db_faiss'
+# load token from environment variable
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 
+# load the saved FAISS vector DB with embedding model
 @st.cache_resource
 def get_vector_store():
     embedding_model = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
@@ -17,11 +20,13 @@ def get_vector_store():
     return db
 
 
+# make a prompt template using Langchain format
 def set_custom_prompt(custom_prompt_template):
     prompt = PromptTemplate(template=custom_prompt_template, input_variables=["context", "question"])
     return prompt
 
 
+# load the Mistral model from Hugging Face
 def load_llm(huggingface_repo_id, HF_TOKEN):
     llm = HuggingFaceEndpoint(
         repo_id=huggingface_repo_id,
@@ -33,6 +38,7 @@ def load_llm(huggingface_repo_id, HF_TOKEN):
     return llm
 
 
+# format source documents for clean display in chat
 def format_source_documents(docs):
     formatted = []
     for i, doc in enumerate(docs, 1):
@@ -40,10 +46,10 @@ def format_source_documents(docs):
         book_name = source_path.split('\\')[-1].split('.pdf')[0].replace('_', ' ')
         page_number = doc.metadata.get('page_label', doc.metadata.get('page', 'N/A'))
 
-        # Clean and format content
-        content = ' '.join(doc.page_content.split()).strip()  # Remove extra whitespace
-        if len(content) > 300:  # Increased from 150 to 300 characters
-            content = content[:300] + '...'  # Show more context before truncating
+        # Clean up text and limit size
+        content = ' '.join(doc.page_content.split()).strip()
+        if len(content) > 300:
+            content = content[:300] + '...'
 
         formatted.append(
             f"**📚 Source {i}**\n"
@@ -54,21 +60,26 @@ def format_source_documents(docs):
     return '\n'.join(formatted)
 
 
-
+# main Streamlit app
 def main():
-    st.title("Ask Chatbot!")
+    st.title("Ask Chatbot!")  # app title
 
+    # initialize message history
     if 'messages' not in st.session_state:
         st.session_state.messages = []
 
+    # show past messages
     for message in st.session_state.messages:
         st.chat_message(message['role']).markdown(message['content'])
 
+    # input box for the user
     prompt = st.chat_input('Pass your prompt here: ')
     if prompt:
+        # display and store user message
         st.chat_message('user').markdown(prompt)
         st.session_state.messages.append({'role': 'user', 'content': prompt})
 
+        # chatbot prompt logic
         custom_prompt_template = """You are a highly intelligent and helpful AI medical assistant. Your job is to answer user queries based strictly on the context provided below.
 
         Follow these rules:
@@ -87,7 +98,10 @@ def main():
         huggingface_repo_id = "mistralai/Mistral-7B-Instruct-v0.3"
 
         try:
+            # load vector database
             vectorstore = get_vector_store()
+
+            # build the QA chain
             qa_chain = RetrievalQA.from_chain_type(
                 llm=load_llm(huggingface_repo_id=huggingface_repo_id, HF_TOKEN=HF_TOKEN),
                 chain_type="stuff",
@@ -96,9 +110,10 @@ def main():
                 chain_type_kwargs={'prompt': set_custom_prompt(custom_prompt_template)}
             )
 
+            # get the answer from the bot
             response = qa_chain.invoke({'query': prompt})
 
-            # Format the response
+            # format the output
             answer = response['result']
             sources = format_source_documents(response["source_documents"])
 
@@ -106,11 +121,12 @@ def main():
                 f"**Answer:**\n{answer}\n\n"
                 f"---\n"
                 f"⚠️ *Disclaimer: This response is based on the provided material and should not be taken as medical advice. Please consult a licensed healthcare professional for real-world concerns.*\n\n"
-                f"---\n"  # Horizontal line separator
+                f"---\n"
                 f"**Supporting Sources:**\n"
                 f"{sources}"
             )
 
+            # display bot message and store it
             st.chat_message('assistant').markdown(formatted_response)
             st.session_state.messages.append({'role': 'assistant', 'content': formatted_response})
 
@@ -118,5 +134,6 @@ def main():
             st.error(f"Error: {str(e)}")
 
 
+# run the app
 if __name__ == "__main__":
     main()
