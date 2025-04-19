@@ -25,7 +25,7 @@ def load_llm(huggingface_repo_id):
     return llm
 
 # path to the saved vector database
-DF_FAISS_PATH = "vectorstore/db_faiss"
+DB_FAISS_PATH = "../vectorstore/db_faiss"
 
 # prompt template for how the bot should talk
 custom_prompt_template = """
