@@ -59,7 +59,7 @@ embedding_model = get_embedding_model()
 
 # Step 4: Create vector store using FAISS and save it
 
-DB_FAISS_PATH = "vectorstore/db_faiss"  # where we want to save the database
+DB_FAISS_PATH = "../vectorstore/db_faiss"  # where we want to save the database
 
 db = FAISS.from_documents(text_chunks, embedding_model)  # convert text chunks to vectors
 db.save_local(DB_FAISS_PATH)  # save the FAISS index to disk
