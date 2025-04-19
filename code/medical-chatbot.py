@@ -7,7 +7,7 @@ import os
 from langchain_huggingface import HuggingFaceEndpoint
 
 # path to saved vector DB
-DB_FAISS_PATH = 'vectorstore/db_faiss'
+DB_FAISS_PATH = "../vectorstore/db_faiss"
 # load token from environment variable
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
